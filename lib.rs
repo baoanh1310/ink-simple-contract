@@ -3,72 +3,45 @@
 use ink_lang as ink;
 
 #[ink::contract]
-mod ink_contract {
+mod mycontract {
+    use ink_storage::traits::SpreadAllocate;
 
-    /// Defines the storage of your contract.
-    /// Add new fields to the below struct in order
-    /// to add new static storage fields to your contract.
     #[ink(storage)]
-    pub struct InkContract {
-        /// Stores a single `bool` value on the storage.
-        value: bool,
+    #[derive(SpreadAllocate)]
+    pub struct MyContract {
+        // Store a mapping from AccountIds to a u32
+        map: ink_storage::Mapping<AccountId, u32>,
     }
 
-    impl InkContract {
-        /// Constructor that initializes the `bool` value to the given `init_value`.
+    impl MyContract {
         #[ink(constructor)]
-        pub fn new(init_value: bool) -> Self {
-            Self { value: init_value }
+        pub fn new(count: u32) -> Self {
+            // This call is required in order to correctly initialize the
+            // `Mapping`s of our contract.
+            ink_lang::utils::initialize_contract(|contract: &mut Self| {
+                let caller = Self::env().caller();
+                contract.map.insert(&caller, &count);
+            })
         }
 
-        /// Constructor that initializes the `bool` value to `false`.
-        ///
-        /// Constructors can delegate to other constructors.
         #[ink(constructor)]
         pub fn default() -> Self {
-            Self::new(Default::default())
+            // Even though we're not explicitly initializing the `Mapping`,
+            // we still need to call this
+            ink_lang::utils::initialize_contract(|_| {})
         }
 
-        /// A message that can be called on instantiated contracts.
-        /// This one flips the value of the stored `bool` from `true`
-        /// to `false` and vice versa.
+        // Grab the number at the caller's AccountID, if it exists
         #[ink(message)]
-        pub fn flip(&mut self) {
-            self.value = !self.value;
+        pub fn get(&self) -> u32 {
+            let caller = Self::env().caller();
+            self.map.get(&caller).unwrap_or_default()
         }
 
-        /// Simply returns the current value of our `bool`.
         #[ink(message)]
-        pub fn get(&self) -> bool {
-            self.value
-        }
-    }
-
-    /// Unit tests in Rust are normally defined within such a `#[cfg(test)]`
-    /// module and test functions are marked with a `#[test]` attribute.
-    /// The below code is technically just normal Rust code.
-    #[cfg(test)]
-    mod tests {
-        /// Imports all the definitions from the outer scope so we can use them here.
-        use super::*;
-
-        /// Imports `ink_lang` so we can use `#[ink::test]`.
-        use ink_lang as ink;
-
-        /// We test if the default constructor does its job.
-        #[ink::test]
-        fn default_works() {
-            let ink_contract = InkContract::default();
-            assert_eq!(ink_contract.get(), false);
-        }
-
-        /// We test a simple use case of our contract.
-        #[ink::test]
-        fn it_works() {
-            let mut ink_contract = InkContract::new(false);
-            assert_eq!(ink_contract.get(), false);
-            ink_contract.flip();
-            assert_eq!(ink_contract.get(), true);
+        pub fn add_number(&mut self, count: u32) {
+            let caller = Self::env().caller();
+            self.map.insert(&caller, &count);
         }
     }
 }
